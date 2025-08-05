@@ -29,7 +29,19 @@
 - **您的设想是什么？**: 详细描述您建议的功能应该如何工作。
 - **有没有替代方案？**: 您是否考虑过其他实现方式？
 
-### 💻 贡献代码
+### 🚀 开发路线图 (Roadmap)
+
+我们已经在项目的 `README.md` 文件中维护了一个公开的 [**TODO List**](../README.md#📝-todo-list)，其中列出了我们计划在未来版本中实现的新功能和改进点。
+
+如果您正在寻找贡献代码的机会，这是一个绝佳的起点！您可以：
+
+1.  **浏览** `TODO List`，看看有没有您感兴趣或擅长的任务。
+2.  在开始开发前，建议您先**创建一个新的 Issue**，声明您打算认领哪个任务，这样可以避免与其他开发者重复工作。
+3.  遵循下面的流程贡献您的代码。
+
+我们尤其欢迎对 `TODO List` 中功能的贡献！
+
+###  贡献代码
 
 如果您希望直接通过代码来改进 NekoInbox，我们非常欢迎！请遵循以下 Pull Request (PR) 流程：
 
@@ -37,7 +49,7 @@
 
 2.  **克隆您的 Fork**:
     ```bash
-    git clone https://github.com/YOUR_USERNAME/NekoInbox.git
+    git clone https://github.com/JQ-28/NekoInbox.git
     cd NekoInbox
     ```
 

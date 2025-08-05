@@ -185,7 +185,9 @@ NEKOINBOX_FRONTEND_URL="https://your-project.pages.dev"
 
 欢迎为这个项目做出贡献！如果您有任何想法、建议或发现了 Bug，请随时提交 [Issues](https://github.com/JQ-28/NekoInbox/issues)。
 
-如果您想贡献代码，请遵循以下流程：
+如果您想贡献代码，我们推荐您先阅读详细的 [**贡献指南 (CONTRIBUTING.md)**](./CONTRIBUTING.md)，它将帮助您更顺利地参与到项目中。
+
+基本流程如下：
 1.  Fork 本仓库
 2.  创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
 3.  提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
