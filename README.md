@@ -51,7 +51,7 @@
 
 首先，Fork 本项目到你的 GitHub 账户，然后将它克隆到你的本地电脑：
 ```bash
-git clone https://github.com/YOUR_USERNAME/NekoInbox.git
+git clone https://github.com/JQ-28/NekoInbox.git
 cd NekoInbox
 ```
 
