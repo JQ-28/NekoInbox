@@ -1,0 +1,40 @@
+# --- System Files ---
+.DS_Store
+Thumbs.db
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+/venv/
+/env/
+/.venv/
+.pytest_cache/
+/htmlcov/
+
+# --- Node.js ---
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# --- Cloudflare Wrangler ---
+.wrangler/
+/dist/
+/build/
+
+# --- Environment & Secrets ---
+# Never commit secrets or environment-specific files.
+# Use .env.example as a template.
+.env
+.env.*
+!.env.example
+*.log
+logs/
