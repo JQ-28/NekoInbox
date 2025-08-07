@@ -2,21 +2,17 @@
 // 这是整个应用的“大脑”，一个跑在 Cloudflare 全球节点上的 Serverless 服务。
 // 它负责处理所有 API 请求，和 KV 数据库打交道，进行权限验证等等。
 
-// --- 安全第一：跨域请求白名单 ---
-// 通过 Pages Functions 集成后，前端调用被视为同源，不再需要配置此项。
-// 仅保留本地开发时所需的地址。
-const allowedOrigins = [
-  'http://127.0.0.1:5500' // 本地开发时用的地址
-];
-
 // 一个小小的全局锁，确保数据迁移只会在 Worker 启动时跑一次。
 let migrationEnsured = false;
 
 // --- 工具函数：给响应头加上 CORS ---
 // 每次返回响应前，都用这个函数“盖个章”，确保浏览器不会因为跨域问题报错。
-function handleCorsAndRespond(request, response) {
+function handleCorsAndRespond(request, response, env) {
   const origin = request.headers.get('Origin');
   
+  // 从环境变量读取允许的前端地址，并为本地开发保留一个默认值。
+  const allowedOrigins = [env.FRONTEND_URL, 'http://127.0.0.1:5500'].filter(Boolean);
+
   // 检查一下请求者是不是“自己人”
   if (allowedOrigins.includes(origin)) {
     response.headers.set('Access-Control-Allow-Origin', origin);
@@ -138,13 +134,13 @@ export default {
 
     // 如果没找到对应的路，就告诉他“你迷路了”。
     const notFoundResponse = new Response('Not Found', { status: 404 });
-    return handleCorsAndRespond(request, notFoundResponse);
+    return handleCorsAndRespond(request, notFoundResponse, env);
   },
 };
 
 // --- 预检请求处理器 ---
 // 告诉浏览器我们支持哪些请求方法、请求头，以及这个“通行证”多久有效。
-function handleOptions(request) {
+function handleOptions(request, env) {
   const headers = request.headers;
   if (
     headers.get('Origin') !== null &&
@@ -157,6 +153,9 @@ function handleOptions(request) {
       'Access-Control-Allow-Headers': headers.get('Access-control-request-headers'),
       'Access-Control-Max-Age': '86400', // 24小时，让浏览器别老是来问
     };
+    
+    // 从环境变量读取允许的前端地址，并为本地开发保留一个默认值。
+    const allowedOrigins = [env.FRONTEND_URL, 'http://127.0.0.1:5500'].filter(Boolean);
 
     if (allowedOrigins.includes(origin)) {
       respHeaders['Access-Control-Allow-Origin'] = origin;
@@ -251,11 +250,11 @@ async function getMessages(request, env) {
     };
 
     const response = new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
   } catch (e) {
     console.error("获取消息列表时翻车了:", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -299,10 +298,10 @@ async function postMessage(request, env) {
     await env.FEEDBACK_KV.put(tagIndexKey, JSON.stringify(tagIndex));
 
     const response = new Response(JSON.stringify({ success: true, message: newMessage }), { status: 201, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -361,14 +360,14 @@ async function handleLogin(request, env) {
     if (password === env.ADMIN_PASSWORD) {
       const token = await generateJWT(env.JWT_SECRET, env);
       const response = new Response(JSON.stringify({ success: true, token }), { headers: { 'Content-Type': 'application/json' } });
-      return handleCorsAndRespond(request, response);
+      return handleCorsAndRespond(request, response, env);
     } else {
       const errorResponse = new Response(JSON.stringify({ success: false, error: '密码不对，再想想？' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
-      return handleCorsAndRespond(request, errorResponse);
+      return handleCorsAndRespond(request, errorResponse, env);
     }
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -407,11 +406,11 @@ async function handleReply(request, env) {
     await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
 
     const response = new Response(JSON.stringify({ success: true, reply: newReply }), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -445,11 +444,11 @@ async function handleVote(request, env) {
     await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
 
     const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -500,11 +499,11 @@ async function deleteMessage(request, env) {
     await env.FEEDBACK_KV.delete(`msg:${messageId}`);
 
     const response = new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -562,12 +561,12 @@ async function handleReport(request, env) {
     }
 
     const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
     console.error("处理举报时发生严重错误:", e.stack);
     const errorResponse = new Response(JSON.stringify({ error: '处理举报时发生未知错误，请联系管理员。' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -623,11 +622,11 @@ async function handleTag(request, env) {
     await env.FEEDBACK_KV.put(newTagIndexKey, JSON.stringify(newTagIndex));
 
     const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response);
+    return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse);
+    return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
@@ -638,7 +637,7 @@ async function getConfig(request, env) {
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
   };
   const response = new Response(JSON.stringify(config), { headers: { 'Content-Type': 'application/json' } });
-  return handleCorsAndRespond(request, response);
+  return handleCorsAndRespond(request, response, env);
 }
 
 // --- 工具函数：通过 Resend 服务发邮件 ---

@@ -4,7 +4,8 @@
 import { showToast } from './ui.js';
 import { API_ENDPOINTS, LOCAL_STORAGE_KEYS } from './constants.js';
 
-const BASE_URL = API_ENDPOINTS.BASE_URL;
+// 从全局变量获取 API 基地址，如果未定义，则回退到本地开发服务器地址。
+const BASE_URL = window.API_BASE_URL || 'http://127.0.0.1:8787';
 let authToken = sessionStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN);
 let turnstileToken = null;
 

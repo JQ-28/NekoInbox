@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>喵喵信箱</title>
+    <script>
+        // 通过此内联脚本，从 Cloudflare Pages 的环境变量中注入后端的 URL。
+        // 在 Pages 项目的设置 -> 环境变量中，添加一个名为 `API_BASE_URL` 的变量，
+        // 其值应为你的 Worker 的完整 URL (例如：https://your-worker.your-name.workers.dev)。
+        window.API_BASE_URL = "{{ API_BASE_URL }}";
+    </script>
     <link rel="icon" href="neko.webp" type="image/webp">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

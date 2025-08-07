@@ -140,7 +140,10 @@ wrangler secret put JWT_SECRET
 # 5. API 访问令牌 (用于 NoneBot 插件与后端通信，输入一个长而随机的字符串)
 wrangler secret put API_TOKEN
 
-# 6. (可选) Resend 邮件提醒，用于接收举报通知
+# 6. 你的前端页面访问地址
+wrangler secret put FRONTEND_URL
+
+# 7. (可选) Resend 邮件提醒，用于接收举报通知
 # wrangler secret put RESEND_API_KEY
 # wrangler secret put SENDER_EMAIL
 # wrangler secret put RECIPIENT_EMAIL
@@ -166,35 +169,13 @@ wrangler deploy
     - **Framework preset**: 选择 `None`。
     - **Build command**: (留空)
     - **Build output directory**: 填入 `web`。
-4.  点击 `Save and Deploy`。
-5.  部署完成后，Cloudflare 会为你提供一个前端页面的 URL (例如 `https://your-project.pages.dev`)。
-
-### 5. 关联 Worker 到 Pages (关键一步)
-
-为了让前端页面能够安全、高效地调用后端 API，我们需要通过 **自定义域路由** 将发往特定路径的请求转发给 Worker。
-
-#### 步骤 1: (可选) 为 Pages 项目配置自定义域
-
-如果想使用自己的域名（例如 `feedback.yourdomain.com`）而不是默认的 `*.pages.dev` 地址，请先在 Pages 项目的 `Custom domains` 设置中完成配置。
-
-#### 步骤 2: 为 Worker 添加路由
-
-这是实现前后端无缝连接的核心。
-
-1.  回到 Cloudflare 主仪表盘，在左侧菜单中选择你的网站域名。
-2.  进入该域名的管理页面后，找到并点击 `Workers Routes` 标签页。
-3.  点击 `Add route` (添加路由)。
-4.  填写路由信息：
-    - **Route (路由)**: 在这里输入 `*<你的Pages域名>/api/*`。
-      - 例如：`*feedback.yourdomain.com/api/*`
-      - 或者，如果使用默认域名：`*your-project.pages.dev/api/*`
-      - **前面的 `*` 号很重要，可以匹配 `http` 和 `https`。**
-    - **Service (服务)**: 在下拉菜单中选择你**第 3 步**部署的 Worker 服务 (默认为 `nekoinbox-worker`)。
-    - **Environment (环境)**: 选择 `production`。
-5.  点击 `Save` (保存)。
-
-
-### 6. 配置机器人插件 (NoneBot2)
+    4.  展开 **Environment variables (advanced)** 部分，点击 `Add variable` 添加一个环境变量：
+        - **Variable name**: `API_BASE_URL`
+        - **Variable value**: 填入你**第 3 步**部署的 Worker 的 URL (例如: `https://your-worker-name.your-username.workers.dev`)
+    5.  点击 `Save and Deploy`。
+    6.  部署完成后，Cloudflare 会为你提供一个前端页面的 URL (例如 `https://your-project.pages.dev`)。请将此 URL 填入你**第 3 步**部署 Worker 时设置的 `FRONTEND_URL` 密钥中，以确保 CORS（跨域资源共享）策略正常工作。
+    
+    ### 5. 配置机器人插件 (NoneBot2)
 
 最后，让你的 NoneBot 机器人能够将收集到的消息发送到后端。
 
