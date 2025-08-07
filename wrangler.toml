@@ -1,0 +1,9 @@
+# 你的 Worker 名称。这个名称可以在 Cloudflare 的仪表盘中被覆盖。
+name = "nekoinbox-api"
+
+# 你的 Worker 的入口文件。
+main = "worker.js"
+
+# 你的 Worker 的兼容性日期。建议使用近期的日期。
+compatibility_date = "2025-08-07"
+
