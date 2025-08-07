@@ -2,6 +2,10 @@
 // 这是整个应用的“大脑”，一个跑在 Cloudflare 全球节点上的 Serverless 服务。
 // 它负责处理所有 API 请求，和 KV 数据库打交道，进行权限验证等等。
 
+// --- 安全第一：CORS 配置 ---
+// 允许的源站地址从环境变量 FRONTEND_URL 中读取，支持多个地址用逗号分隔。
+// 这样做更安全、更灵活，符合部署要求。
+
 // 一个小小的全局锁，确保数据迁移只会在 Worker 启动时跑一次。
 let migrationEnsured = false;
 
@@ -10,8 +14,9 @@ let migrationEnsured = false;
 function handleCorsAndRespond(request, response, env) {
   const origin = request.headers.get('Origin');
   
-  // 从环境变量读取允许的前端地址，并为本地开发保留一个默认值。
-  const allowedOrigins = [env.FRONTEND_URL, 'http://127.0.0.1:5500'].filter(Boolean);
+  // 从环境变量中读取允许的源，支持逗号分隔的多个 URL
+  const frontendUrl = env.FRONTEND_URL || '';
+  const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(Boolean);
 
   // 检查一下请求者是不是“自己人”
   if (allowedOrigins.includes(origin)) {
@@ -110,7 +115,7 @@ export default {
 
     // 浏览器会先发个 OPTIONS 预检请求来“投石问路”，咱们得热情回应。
     if (request.method === 'OPTIONS') {
-      return handleOptions(request);
+      return handleOptions(request, env);
     }
 
     // 一个超级迷你的“路由器”，根据请求方法和路径，把它交给对应的处理函数。
@@ -153,9 +158,10 @@ function handleOptions(request, env) {
       'Access-Control-Allow-Headers': headers.get('Access-control-request-headers'),
       'Access-Control-Max-Age': '86400', // 24小时，让浏览器别老是来问
     };
-    
-    // 从环境变量读取允许的前端地址，并为本地开发保留一个默认值。
-    const allowedOrigins = [env.FRONTEND_URL, 'http://127.0.0.1:5500'].filter(Boolean);
+
+    // 从环境变量中读取允许的源，支持逗号分隔的多个 URL
+    const frontendUrl = env.FRONTEND_URL || '';
+    const allowedOrigins = frontendUrl.split(',').map(url => url.trim()).filter(Boolean);
 
     if (allowedOrigins.includes(origin)) {
       respHeaders['Access-Control-Allow-Origin'] = origin;
@@ -177,7 +183,7 @@ async function getMessages(request, env) {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
   const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '10', 10));
   const searchTerm = url.searchParams.get('search')?.toLowerCase().trim();
-  const filterByTag = url.search_params.get('filterByTag');
+  const filterByTag = url.searchParams.get('filterByTag');
   const sortBy = url.searchParams.get('sortBy') || 'likes';
 
   try {
@@ -599,7 +605,7 @@ async function handleTag(request, env) {
     if (oldTag === tag) {
       // 标签没变，就别瞎忙活了。
       const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
-      return handleCorsAndRespond(request, response);
+      return handleCorsAndRespond(request, response, env);
     }
 
     // 更新消息里的标签。

@@ -65,7 +65,7 @@ cd NekoInbox
 2.  选择你 Fork 的 `NekoInbox` 仓库。
 3.  在 **Set up your application** 中：
     - **Project name**: 为你的 Worker 服务起一个名字 (例如 `nekoinbox-api`)。
-4.  点击 `Save and Deploy`。Cloudflare 会自动为你创建 Worker 并完成首次部署。
+4.  点击 `Create and Deploy`。Cloudflare 会自动为你创建 Worker 并完成首次部署。
 
 #### 步骤 2: 创建并绑定 KV 数据库
 
@@ -82,14 +82,14 @@ cd NekoInbox
 为了防止机器人滥用，我们需要配置人机验证。
 
 1.  访问 Cloudflare 仪表盘 -> `Turnstile`。
-2.  创建一个新的小组件，域名填写你**第 4 步**部署的前端页面地址，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
+2.  创建一个新的小组件，主机名填写你绑定的域名，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
 
 #### 步骤 4: 设置密钥
 
 **这是最重要的一步。** 为了安全，所有敏感信息都必须在 Worker 的设置中配置为密钥。
 
-1.  回到你的 Worker 设置页面 (`Settings` -> `Variables`)。
-2.  找到 **Environment Variables** 部分，点击 `Add variable`，然后选择 `Encrypt` 来添加加密密钥。
+1.  回到你的 Worker 设置页面 (`Settings` -> `Variables and Secrets`)。
+2.  点击`Add`来添加加密密钥，**TYPE**都为`Secret`
 3.  根据下表，依次添加所有必需的密钥：
 
 | 变量名                  | 值                                                               | 描述                                       |
@@ -98,8 +98,8 @@ cd NekoInbox
 | `TURNSTILE_SITE_KEY`    | (从上一步获取)                                                   | Turnstile 的 Site Key，会公开给前端。      |
 | `ADMIN_PASSWORD`        | (自定义)                                                         | 用于登录网页后台的密码。                   |
 | `JWT_SECRET`            | (自定义，一个长而随机的字符串)                                   | 用于签发管理员登录凭证的密钥。             |
-| `API_TOKEN`             | (自定义，一个长而随机的字符串)                                   | 用于 NoneBot 插件与后端通信的“暗号”。      |
-| `FRONTEND_URL`          | (你的前端页面完整 URL)                                           | 你的前端访问地址，用于配置 CORS 策略。     |
+| `API_TOKEN`             | (自定义，一个长而随机的字符串)                                   | 用于 NoneBot 插件与后端通信的“暗号”。 （需要记下用于之后nonebot配置）     |
+| `FRONTEND_URL`          | (你的前端页面完整 URL)                                           | 你的前端访问地址，用于配置 CORS 策略。待后续前端配置完再填写     |
 | `RESEND_API_KEY`        | (可选)                                                           | Resend 服务的 API Key。                    |
 | `SENDER_EMAIL`          | (可选, 例如 `noreply@yourdomain.com`)                            | 发送提醒邮件的邮箱地址。                   |
 | `RECIPIENT_EMAIL`       | (可选, 你的接收邮箱)                                             | 接收举报通知的管理员邮箱。                 |
@@ -112,7 +112,7 @@ cd NekoInbox
 
 前端页面用于展示和管理所有反馈。
 
-1.  访问 Cloudflare 仪表盘 -> `Workers & Pages` -> `Create application` -> `Pages` -> `Connect to Git`。
+1.  访问 Cloudflare 仪表盘 -> `Workers & Pages` -> `Create` -> `Pages` -> `Import an existing Git repository`。
 2.  选择你 Fork 的 `NekoInbox` 仓库。
 3.  在 **Build settings** 中：
     - **Framework preset**: 选择 `None`。

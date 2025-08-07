@@ -164,43 +164,6 @@ h1 {
     box-shadow: none;
 }
 
-/* [NEW] GitHub Icon Button Style */
-.header-icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background-color: transparent;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    color: #8a6bb5;
-    transition: all 0.3s ease;
-}
-
-.header-icon-btn:hover {
-    background-color: rgba(138, 107, 181, 0.1);
-    color: #5D4037;
-}
-
-.header-icon-btn svg {
-    transition: transform 0.3s ease;
-}
-
-.header-icon-btn:hover svg {
-    transform: scale(1.1);
-}
-
-body.dark-mode .header-icon-btn {
-    color: #a991d4;
-}
-
-body.dark-mode .header-icon-btn:hover {
-    background-color: rgba(169, 145, 212, 0.15);
-    color: #e0e0e0;
-}
-
 /* --- [CSS Grid Masonry] 留言板与卡片 --- */
 #messageBoard {
     display: grid;
