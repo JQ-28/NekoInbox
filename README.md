@@ -20,7 +20,7 @@
 - **精美的 UI**: 拥有一个支持**亮色/暗色模式**切换的、带有流畅动画的现代化界面，暗色模式下还有**动态星空背景**。初始加载时使用**骨架屏**优化用户感知速度。
 - **性能优化**: 对滚动等高频事件进行**节流(Throttle)**处理，减少不必要的计算，保证页面流畅运行。
 - **安全可靠**: 使用 JWT (JSON Web Tokens) 进行管理员权限验证，并集成了 **Cloudflare Turnstile** 人机验证，保护公开接口，有效防止滥用。
-- **邮件提醒**: 当有用户举报消息时，可配置通过 Resend 服务向管理员发送邮件提醒。
+- **邮件提醒**: 当有用户举报消息时，可配置通过 [Resend](https://resend.com/) 服务向管理员发送邮件提醒。
 
 ## 🖼️ 效果预览
 
@@ -42,7 +42,7 @@
 ### 1. 准备工作
 
 在开始之前，请确保你拥有：
-- 一个 [Cloudflare](https://www.cloudflare.com/) 账户。
+- 一个 [Cloudflare](https://www.cloudflare.com/) 账户（需要绑定域名）
 - 一个 [GitHub](https://github.com/) 账户。
 - [Node.js](https://nodejs.org/en/) (v16.13.0 或更高版本) 和 [npm](https://www.npmjs.com/)。
 - [Python](https://www.python.org/) (3.8 或更高版本) 和 [pip](https://pip.pypa.io/en/stable/)。
@@ -74,9 +74,26 @@ wrangler login
 
 我们需要一个 KV 命名空间来存储所有的反馈数据。
 ```bash
-wrangler kv:namespace create "FEEDBACK_KV"
+wrangler kv namespace create "FEEDBACK_KV"
 ```
-这个命令会输出 `id` 和 `preview_id`。
+如果没出问题那么命令行会输出类似于下面的效果
+```bash
+ ⛅️ wrangler 4.27.0 (update available 4.28.0)
+─────────────────────────────────────────────
+Resource location: remote
+🌀 Creating namespace with title "FEEDBACK_KV"
+✨ Success!
+Add the following to your configuration file in your kv_namespaces array:
+{
+  "kv_namespaces": [
+    {
+      "binding": "FEEDBACK_KV",
+      "id": "你的KV数据库id"
+    }
+  ]
+}
+```
+
 
 #### 步骤 3: 配置 `wrangler.toml`
 
@@ -84,11 +101,11 @@ wrangler kv:namespace create "FEEDBACK_KV"
 1.  将上一步中输出的生产环境 `id` 填入 `[[kv_namespaces]]` 部分的 `id` 字段。
 2.  (可选) 修改 `name` 字段为你喜欢的 Worker 名称。
 
-#### 步骤 4: 创建 Turnstile 站点
+#### 步骤 4: 创建 Turnstile 小组件
 
 为了防止机器人滥用，我们需要配置人机验证。
 1.  访问 Cloudflare 仪表盘 -> `Turnstile`。
-2.  创建一个新的站点，获取 **Site Key** 和 **Secret Key**。
+2.  创建一个新的小组件，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
 
 #### 步骤 5: 设置环境变量和密钥
 
@@ -143,7 +160,22 @@ wrangler deploy
 4.  点击 `Save and Deploy`。
 5.  部署完成后，Cloudflare 会为你提供一个前端页面的 URL (例如 `https://your-project.pages.dev`)。
 
-### 5. 配置机器人插件 (NoneBot2)
+### 5. 关联 Worker 到 Pages (关键一步)
+
+为了让前端页面能够安全、高效地调用后端 API，我们需要利用 Cloudflare Pages 的 **函数集成 (Functions integration)** 功能。
+
+1.  在你刚刚创建的 Pages 项目设置页面，找到 `Settings` -> `Functions`。
+2.  在 **Functions** 页面，向下滚动到 **Worker integration** 部分。
+3.  点击 `Add integration`。
+4.  在 **Service** 下拉菜单中，选择你**第 3 步**部署的 Worker 服务。
+5.  在 **Route** 字段中，输入 `/api/*`。这会将所有以 `/api/` 开头的请求，从你的 Pages 域名直接转发到你的 Worker，无需暴露 Worker 的真实地址，也无需处理 CORS。
+6.  点击 `Save`。
+
+![Pages Functions Integration](./assets/functions-integration.png)
+
+完成这一步后，你的前端和后端就无缝连接了！
+
+### 6. 配置机器人插件 (NoneBot2)
 
 最后，让你的 NoneBot 机器人能够将收集到的消息发送到后端。
 
@@ -169,11 +201,29 @@ NEKOINBOX_FRONTEND_URL="https://your-project.pages.dev"
 
 ```
 .
-├── nonebot_plugin_nekoinbox/ # NoneBot2 插件
-├── api/                      # Cloudflare Worker 后端
-├── web/                      # 前端静态页面
-├── assets/                   # README 使用的静态资源
-└── README.md
+├── .gitignore                # Git 忽略文件配置
+├── CONTRIBUTING.md           # 贡献指南
+├── LICENSE                   # MIT 许可证
+├── README.md                 # 项目主说明文档
+├── api/
+│   ├── worker.js             # Cloudflare Worker 的核心后端逻辑
+│   └── wrangler.toml         # Worker 配置文件 (服务名称, KV绑定等)
+├── assets/                   # README 中使用的图片资源
+│   ├── 浅色.jpg
+│   └── 深色.jpg
+├── nonebot_plugin_nekoinbox/
+│   └── __init__.py           # NoneBot2 插件入口及逻辑
+└── web/
+    ├── index.html            # 前端主页面
+    ├── neko.webp             # 网站图标
+    ├── css/
+    │   └── style.css         # 页面所有样式
+    └── js/
+        ├── api.js            # 封装与后端 API 的所有通信
+        ├── constants.js      # 存放项目中的常量 (如本地存储键名)
+        ├── events.js         # 统一管理页面所有的事件监听器
+        ├── main.js           # 页面主逻辑入口，负责初始化和加载
+        └── ui.js             # 负责所有 UI 相关的操作 (如渲染消息, 显示/隐藏加载动画)
 ```
 
 ## 📞 联系我

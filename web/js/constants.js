@@ -11,7 +11,7 @@ export const LOCAL_STORAGE_KEYS = {
 
 // 后端 API 接口路径
 export const API_ENDPOINTS = {
-    BASE_URL: 'https://your-worker-name.your-subdomain.workers.dev', // 【重要】请替换为你的 Worker 地址
+    BASE_URL: '', // 通过 Pages Functions 集成，直接使用相对路径
     MESSAGES: '/api/messages',
     CONFIG: '/api/config',
     LOGIN: '/api/login',

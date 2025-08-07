@@ -3,9 +3,9 @@
 // 它负责处理所有 API 请求，和 KV 数据库打交道，进行权限验证等等。
 
 // --- 安全第一：跨域请求白名单 ---
-// 只有在这里列出的网址，才有资格请求我们的 API。
+// 通过 Pages Functions 集成后，前端调用被视为同源，不再需要配置此项。
+// 仅保留本地开发时所需的地址。
 const allowedOrigins = [
-  'https://your-pages-project-name.pages.dev', // 【重要】请替换为你的 Pages 项目地址
   'http://127.0.0.1:5500' // 本地开发时用的地址
 ];
 

@@ -44,9 +44,9 @@ async_client = httpx.AsyncClient(timeout=15.0)
 # --- 命令响应器 ---
 # 定义三个命令，分别处理用户的反馈、建议和投信。
 # 优先级设为 10，block=True 表示同一时间只处理一个命令，防止混淆。
-feedback_matcher = on_command("反馈", priority=10, block=True)
-suggestion_matcher = on_command("建议", priority=10, block=True)
-submission_matcher = on_command("投信", priority=10, block=True)
+feedback_matcher = on_command("#反馈", priority=10, block=True)
+suggestion_matcher = on_command("#建议", priority=10, block=True)
+submission_matcher = on_command("#投信", priority=10, block=True)
 
 
 async def process_message(matcher: Matcher, bot: Bot, event: Event, args: Message, msg_type: str):
