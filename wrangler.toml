@@ -7,3 +7,13 @@ main = "worker.js"
 # 你的 Worker 的兼容性日期。建议使用近期的日期。
 compatibility_date = "2025-08-07"
 
+# --- 数据库绑定 ---
+# 注意：请勿将包含真实 database_id 的配置直接提交到公共代码库。
+# 下面的配置块是一个示例。请根据 README.md 中的指南，
+# 在 Cloudflare 仪表盘或使用 wrangler cli 创建 D1 数据库后，
+# 将生成的绑定配置添加到您的 Worker 设置中或用于本地开发。
+#
+# [[d1_databases]]
+# binding = "DB" # 在 worker.js 中通过 env.DB 访问
+# database_name = "neko-inbox-db"
+# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

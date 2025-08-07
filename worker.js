@@ -1,13 +1,10 @@
-// --- Cloudflare Worker 后端核心 ---
+// --- Cloudflare Worker 后端核心 (D1 版本) ---
 // 这是整个应用的“大脑”，一个跑在 Cloudflare 全球节点上的 Serverless 服务。
-// 它负责处理所有 API 请求，和 KV 数据库打交道，进行权限验证等等。
+// 它负责处理所有 API 请求，和 D1 数据库打交道，进行权限验证等等。
 
 // --- 安全第一：CORS 配置 ---
 // 允许的源站地址从环境变量 FRONTEND_URL 中读取，支持多个地址用逗号分隔。
 // 这样做更安全、更灵活，符合部署要求。
-
-// 一个小小的全局锁，确保数据迁移只会在 Worker 启动时跑一次。
-let migrationEnsured = false;
 
 // --- 工具函数：给响应头加上 CORS ---
 // 每次返回响应前，都用这个函数“盖个章”，确保浏览器不会因为跨域问题报错。
@@ -55,62 +52,9 @@ async function validateTurnstileToken(token, ip, env) {
   }
 }
 
-// --- 工具函数：一次性数据迁移脚本 ---
-// 用来把旧的、存在单个 KV 值里的数据，迁移到新的“一个消息一个坑”的模式。
-// 这大大提升了性能，老代码立功了！
-async function handleMigration(env) {
-  try {
-    const oldData = await env.FEEDBACK_KV.get('messages', { type: 'json' });
-    if (oldData && Array.isArray(oldData)) {
-      console.log(`发现 ${oldData.length} 条旧数据，开始搬家...`);
-      
-      const messageIds = [];
-      const tagIndexes = {}; // 按标签给消息 ID 分类建索引
-
-      const putPromises = oldData.map(message => {
-        if (!message.id) message.id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        if (!message.tag) message.tag = '待处理';
-        
-        messageIds.push(message.id);
-        
-        if (!tagIndexes[message.tag]) tagIndexes[message.tag] = [];
-        tagIndexes[message.tag].push(message.id);
-
-        return env.FEEDBACK_KV.put(`msg:${message.id}`, JSON.stringify(message));
-      });
-
-      await Promise.all(putPromises);
-      
-      // 创建新的主 ID 列表和标签索引
-      await env.FEEDBACK_KV.put('message_ids', JSON.stringify(messageIds));
-      const tagIndexPromises = Object.entries(tagIndexes).map(([tag, ids]) => {
-        const tagIndexKey = `index_tag_${tag}`;
-        console.log(`给标签 "${tag}" 创建索引，一共 ${ids.length} 条。`);
-        return env.FEEDBACK_KV.put(tagIndexKey, JSON.stringify(ids.reverse()));
-      });
-      await Promise.all(tagIndexPromises);
-      
-      // 把旧数据改个名备份一下，防止下次还想不开要迁移
-      await env.FEEDBACK_KV.put('messages_migrated_bak', JSON.stringify(oldData));
-      await env.FEEDBACK_KV.delete('messages');
-
-      console.log("数据搬家顺利完成！");
-    }
-  } catch (e) {
-    console.error("数据搬家时出了点意外:", e);
-    // 就算搬家失败，也不能耽误正常服务。
-  }
-}
-
 // --- Worker 的主入口 ---
 export default {
   async fetch(request, env, ctx) {
-    // Worker 启动时，先检查下要不要数据迁移
-    if (!migrationEnsured) {
-      await handleMigration(env);
-      migrationEnsured = true;
-    }
-
     const url = new URL(request.url);
 
     // 浏览器会先发个 OPTIONS 预检请求来“投石问路”，咱们得热情回应。
@@ -175,137 +119,135 @@ function handleOptions(request, env) {
   }
 }
 
-// --- API 处理器：获取消息列表 ---
-// 这是最复杂的一个函数，集分页、搜索、过滤、排序于一身。
+// --- API 处理器：获取消息列表 (D1 版本) ---
+// 性能提升的核心！所有复杂逻辑都交给 SQL 处理。
 async function getMessages(request, env) {
-  const url = new URL(request.url);
-  // 从 URL里把各种参数先抠出来，给好默认值，免得出错。
-  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
-  const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '10', 10));
-  const searchTerm = url.searchParams.get('search')?.toLowerCase().trim();
-  const filterByTag = url.searchParams.get('filterByTag');
-  const sortBy = url.searchParams.get('sortBy') || 'likes';
+    const url = new URL(request.url);
+    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+    const limit = Math.max(1, parseInt(url.searchParams.get('limit') || '10', 10));
+    const searchTerm = url.searchParams.get('search')?.toLowerCase().trim();
+    const filterByTag = url.searchParams.get('filterByTag');
+    const sortBy = url.searchParams.get('sortBy') || 'likes';
 
-  try {
-    let messageIds;
-    // 第一步：先确定要展示哪些消息的 ID。
-    // 如果按标签过滤，就从标签索引里拿；否则就从主列表里拿。
-    if (filterByTag && filterByTag !== 'all') {
-      const tagIndexKey = `index_tag_${filterByTag}`;
-      messageIds = await env.FEEDBACK_KV.get(tagIndexKey, { type: 'json' }) || [];
-    } else {
-      messageIds = await env.FEEDBACK_KV.get('message_ids', { type: 'json' }) || [];
-    }
+    try {
+        let conditions = [];
+        const params = [];
 
-    let allMessages;
-    let paginatedMessages;
-    let totalMessages = messageIds.length;
-
-    // 第二步：智能选择不同的处理路径，这是性能优化的关键。
-    // 如果需要搜索，或者按点赞/回复数排序，那就没办法，只能把所有消息都捞出来慢慢处理。
-    const needsFullData = searchTerm || sortBy === 'likes' || sortBy === 'replies';
-
-    if (needsFullData) {
-      // --- “慢车道”：适用于搜索和复杂排序 ---
-      const promises = messageIds.map(id => env.FEEDBACK_KV.get(`msg:${id}`, { type: 'json' }));
-      allMessages = (await Promise.all(promises)).filter(Boolean); // 过滤掉可能已删除的
-
-      if (searchTerm) {
-        allMessages = allMessages.filter(msg =>
-          msg.id.toLowerCase().includes(searchTerm) ||
-          msg.user_name.toLowerCase().includes(searchTerm) ||
-          msg.content.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      // 手动排序
-      allMessages.sort((a, b) => {
-        switch (sortBy) {
-          case 'replies': return (b.replies?.length || 0) - (a.replies?.length || 0);
-          case 'date': return new Date(b.timestamp) - new Date(a.timestamp);
-          case 'likes':
-          default: return (b.likes || 0) - (a.likes || 0);
+        if (searchTerm) {
+            conditions.push(`(m.content LIKE ?1 OR m.user_name LIKE ?1)`);
+            params.push(`%${searchTerm}%`);
         }
-      });
-      
-      totalMessages = allMessages.length;
-      const startIndex = (page - 1) * limit;
-      paginatedMessages = allMessages.slice(startIndex, startIndex + limit);
 
-    } else {
-      // --- “快车道”：适用于默认的时间排序 ---
-      // 因为 ID 列表本身就是按时间倒序的，所以我们只需要按需取出当前页的 ID，再去查数据就行了，超快！
-      const startIndex = (page - 1) * limit;
-      const paginatedIds = messageIds.slice(startIndex, startIndex + limit);
-      
-      if (paginatedIds.length > 0) {
-        const promises = paginatedIds.map(id => env.FEEDBACK_KV.get(`msg:${id}`, { type: 'json' }));
-        paginatedMessages = (await Promise.all(promises)).filter(Boolean);
-      } else {
-        paginatedMessages = [];
-      }
+        if (filterByTag && filterByTag !== 'all') {
+            conditions.push(`m.tag = ?${params.length + 1}`);
+            params.push(filterByTag);
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+        // 构建获取总数和获取消息列表的 SQL
+        const countQuery = `SELECT COUNT(*) as total FROM messages m ${whereClause}`;
+        
+        let messagesQuery = `
+            SELECT m.*, (SELECT COUNT(*) FROM replies r WHERE r.message_id = m.id) as replies_count
+            FROM messages m
+            ${whereClause}
+        `;
+
+        switch (sortBy) {
+            case 'replies':
+                messagesQuery += ' ORDER BY replies_count DESC';
+                break;
+            case 'date':
+                messagesQuery += ' ORDER BY m.timestamp DESC';
+                break;
+            default: // 'likes'
+                messagesQuery += ' ORDER BY m.likes DESC, m.timestamp DESC';
+                break;
+        }
+
+        messagesQuery += ` LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`;
+        const messagesParams = [...params, limit, (page - 1) * limit];
+
+        // 使用 D1 的 batch API 一次性执行两个查询
+        const [totalResult, messagesResult] = await env.DB.batch([
+            env.DB.prepare(countQuery).bind(...params),
+            env.DB.prepare(messagesQuery).bind(...messagesParams),
+        ]);
+
+        const totalMessages = totalResult.results[0].total;
+        const messages = messagesResult.results;
+
+        // 获取所有相关消息的回复
+        const messageIds = messages.map(m => m.id);
+        let repliesByMessageId = {};
+
+        if (messageIds.length > 0) {
+            const repliesQuery = `SELECT * FROM replies WHERE message_id IN (${messageIds.map(() => '?').join(',')}) ORDER BY timestamp ASC`;
+            const repliesResult = await env.DB.prepare(repliesQuery).bind(...messageIds).all();
+            
+            repliesResult.results.forEach(reply => {
+                if (!repliesByMessageId[reply.message_id]) {
+                    repliesByMessageId[reply.message_id] = [];
+                }
+                repliesByMessageId[reply.message_id].push(reply);
+            });
+        }
+        
+        // 将回复附加到消息对象上
+        messages.forEach(message => {
+            message.replies = repliesByMessageId[message.id] || [];
+            delete message.replies_count; // 这个字段只用于排序，不需要返回给前端
+        });
+
+        const totalPages = Math.ceil(totalMessages / limit);
+
+        const responsePayload = {
+            messages,
+            totalMessages,
+            totalPages,
+            currentPage: page,
+        };
+
+        const response = new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
+        return handleCorsAndRespond(request, response, env);
+
+    } catch (e) {
+        console.error("获取消息列表时翻车了 (D1):", e);
+        const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        return handleCorsAndRespond(request, errorResponse, env);
     }
-
-    const totalPages = Math.ceil(totalMessages / limit);
-
-    const responsePayload = {
-      messages: paginatedMessages,
-      totalMessages,
-      totalPages,
-      currentPage: page,
-    };
-
-    const response = new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, response, env);
-  } catch (e) {
-    console.error("获取消息列表时翻车了:", e);
-    const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    return handleCorsAndRespond(request, errorResponse, env);
-  }
 }
 
-// --- API 处理器：提交新消息 ---
-// NoneBot 插件调用的就是这个接口。
+
+// --- API 处理器：提交新消息 (D1 版本) ---
 async function postMessage(request, env) {
-  // 先对暗号，看看是不是自己人。
   const token = request.headers.get('Authorization')?.replace('Bearer ', '');
   if (token !== env.API_TOKEN) {
     return new Response('暗号不对，军情小本本上没有你！', { status: 401 });
   }
 
   try {
-    const newMessage = await request.json();
-    if (!newMessage.type || !newMessage.user_name || !newMessage.user_id || !newMessage.content) {
+    const newMessageData = await request.json();
+    if (!newMessageData.type || !newMessageData.user_name || !newMessageData.user_id || !newMessageData.content) {
       return new Response('我说，你是不是忘了点啥？（缺少字段）', { status: 400 });
     }
 
-    // 服务器给新消息“盖章”，加上 ID、时间戳等信息。
-    newMessage.id = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    newMessage.timestamp = new Date().toISOString();
-    newMessage.replies = [];
-    newMessage.likes = 0;
-    newMessage.dislikes = 0;
-    newMessage.reports = 0;
-    newMessage.tag = '待处理';
+    const newMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...newMessageData,
+    };
 
-    // 把新消息存进 KV。
-    await env.FEEDBACK_KV.put(`msg:${newMessage.id}`, JSON.stringify(newMessage));
-
-    // 更新主 ID 列表和标签索引，让新消息能立刻被看到。
-    const idListData = await env.FEEDBACK_KV.get('message_ids', { type: 'json' });
-    const messageIds = idListData || [];
-    messageIds.unshift(newMessage.id);
-    await env.FEEDBACK_KV.put('message_ids', JSON.stringify(messageIds));
-
-    const tagIndexKey = `index_tag_${newMessage.tag}`;
-    const tagIndexData = await env.FEEDBACK_KV.get(tagIndexKey, { type: 'json' });
-    const tagIndex = tagIndexData || [];
-    tagIndex.unshift(newMessage.id);
-    await env.FEEDBACK_KV.put(tagIndexKey, JSON.stringify(tagIndex));
+    const ps = env.DB.prepare(
+      'INSERT INTO messages (id, type, user_name, user_id, content) VALUES (?1, ?2, ?3, ?4, ?5)'
+    );
+    await ps.bind(newMessage.id, newMessage.type, newMessage.user_name, newMessage.user_id, newMessage.content).run();
 
     const response = new Response(JSON.stringify({ success: true, message: newMessage }), { status: 201, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
+
   } catch (e) {
+    console.error("提交新消息时翻车了 (D1):", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
@@ -324,7 +266,6 @@ async function getCryptoKey(secret) {
 async function generateJWT(secret, env) {
   const key = await getCryptoKey(secret);
   const header = { alg: 'HS256', typ: 'JWT' };
-  // 通行证有效期，默认 8 小时，也可以在环境变量里配。
   const expirationSeconds = env && env.JWT_EXPIRATION_SECONDS ? parseInt(env.JWT_EXPIRATION_SECONDS, 10) : (8 * 60 * 60);
   const payload = { exp: Math.floor(Date.now() / 1000) + expirationSeconds };
   
@@ -348,14 +289,14 @@ async function verifyJWT(token, secret) {
     const signatureData = new Uint8Array(atob(signature.replace(/-/g, '+').replace(/_/g, '/')).split('').map(c => c.charCodeAt(0)));
     
     const isValid = await crypto.subtle.verify('HMAC', key, signatureData, data);
-    if (!isValid) return null; // 签名不对，是伪造的！
+    if (!isValid) return null;
     
     const decodedPayload = JSON.parse(textDecoder.decode(new Uint8Array(atob(payload.replace(/-/g, '+').replace(/_/g, '/')).split('').map(c => c.charCodeAt(0)))));
-    if (decodedPayload.exp < Math.floor(Date.now() / 1000)) return null; // 过期了！
+    if (decodedPayload.exp < Math.floor(Date.now() / 1000)) return null;
     
     return decodedPayload;
   } catch (e) {
-    return null; // 格式不对或者其他幺蛾子
+    return null;
   }
 }
 
@@ -377,10 +318,9 @@ async function handleLogin(request, env) {
   }
 }
 
-// --- API 处理器：管理员回复 ---
+// --- API 处理器：管理员回复 (D1 版本) ---
 async function handleReply(request, env) {
   try {
-    // 先查岗，看看有没有带“临时通行证”(JWT)。
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response('没带通行证，禁止入内！', { status: 401 });
@@ -397,35 +337,32 @@ async function handleReply(request, env) {
       return new Response('要回复哪条？回复啥？说清楚点儿。', { status: 400 });
     }
 
-    const message = await env.FEEDBACK_KV.get(`msg:${messageId}`, { type: 'json' });
-    if (!message) {
-      return new Response('没找着这条消息啊。', { status: 404 });
-    }
-
     const newReply = {
-      id: `reply-${Date.now()}`,
+      id: `reply-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       content: replyContent,
     };
-    message.replies.push(newReply);
 
-    await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
+    const ps = env.DB.prepare(
+      'INSERT INTO replies (id, message_id, content, timestamp) VALUES (?1, ?2, ?3, ?4)'
+    );
+    await ps.bind(newReply.id, messageId, newReply.content, newReply.timestamp).run();
 
     const response = new Response(JSON.stringify({ success: true, reply: newReply }), { headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
+    console.error("回复时翻车了 (D1):", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
-// --- API 处理器：处理投票（点赞/点踩） ---
+// --- API 处理器：处理投票（点赞/点踩） (D1 版本) ---
 async function handleVote(request, env) {
   try {
     const { messageId, voteType, 'cf-turnstile-response': turnstileToken } = await request.json();
 
-    // 先让“电子保镖”检查一下，是不是真人在操作。
     const ip = request.headers.get('CF-Connecting-IP');
     const turnstileResult = await validateTurnstileToken(turnstileToken, ip, env);
     if (!turnstileResult.success) {
@@ -436,32 +373,29 @@ async function handleVote(request, env) {
       return new Response('你想干啥？（缺少 messageId 或 voteType 无效）', { status: 400 });
     }
 
-    const message = await env.FEEDBACK_KV.get(`msg:${messageId}`, { type: 'json' });
-    if (!message) {
+    const field = voteType === 'like' ? 'likes' : 'dislikes';
+    const ps = env.DB.prepare(
+      `UPDATE messages SET ${field} = ${field} + 1 WHERE id = ?1 RETURNING *`
+    );
+    const { results } = await ps.bind(messageId).all();
+
+    if (results.length === 0) {
       return new Response('没找着这条消息啊。', { status: 404 });
     }
 
-    if (voteType === 'like') {
-      message.likes = (message.likes || 0) + 1;
-    } else if (voteType === 'dislike') {
-      message.dislikes = (message.dislikes || 0) + 1;
-    }
-
-    await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
-
-    const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
+    const response = new Response(JSON.stringify({ success: true, message: results[0] }), { headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
+    console.error("投票时翻车了 (D1):", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
-// --- API 处理器：删除消息 ---
+// --- API 处理器：删除消息 (D1 版本) ---
 async function deleteMessage(request, env) {
   try {
-    // 查岗，只有管理员才能删东西。
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response('没带通行证，禁止入内！', { status: 401 });
@@ -478,47 +412,28 @@ async function deleteMessage(request, env) {
       return new Response('你要删哪条？说清楚点儿。', { status: 400 });
     }
 
-    // 删除操作要谨慎，先读后删，一步步来。
-    const message = await env.FEEDBACK_KV.get(`msg:${messageId}`, { type: 'json' });
-    const idListData = await env.FEEDBACK_KV.get('message_ids', { type: 'json' });
-    let messageIds = idListData || [];
+    const ps = env.DB.prepare('DELETE FROM messages WHERE id = ?1');
+    const { success } = await ps.bind(messageId).run();
 
-    // 1. 从主 ID 列表里把它踢出去。
-    const initialLength = messageIds.length;
-    messageIds = messageIds.filter(id => id !== messageId);
-    if (messageIds.length === initialLength) {
-      console.warn(`想删的 ${messageId} 在主列表里没找到，但还是继续操作。`);
+    if (!success) {
+        return new Response('删除失败，可能消息不存在。', { status: 404 });
     }
-    await env.FEEDBACK_KV.put('message_ids', JSON.stringify(messageIds));
-
-    // 2. 如果它有标签，也要从对应的标签索引里把它除名。
-    if (message && message.tag) {
-        const tagIndexKey = `index_tag_${message.tag}`;
-        const tagIndexData = await env.FEEDBACK_KV.get(tagIndexKey, { type: 'json' });
-        if (tagIndexData) {
-            const updatedIndex = tagIndexData.filter(id => id !== messageId);
-            await env.FEEDBACK_KV.put(tagIndexKey, JSON.stringify(updatedIndex));
-        }
-    }
-
-    // 3. 最后，把消息本体删掉，毁尸灭迹。
-    await env.FEEDBACK_KV.delete(`msg:${messageId}`);
 
     const response = new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
+    console.error("删除时翻车了 (D1):", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
-// --- API 处理器：处理举报 ---
+// --- API 处理器：处理举报 (D1 版本) ---
 async function handleReport(request, env) {
   try {
     const { messageId, 'cf-turnstile-response': turnstileToken } = await request.json();
 
-    // “电子保镖”再次出马。
     const ip = request.headers.get('CF-Connecting-IP');
     const turnstileResult = await validateTurnstileToken(turnstileToken, ip, env);
     if (!turnstileResult.success) {
@@ -529,15 +444,15 @@ async function handleReport(request, env) {
       return new Response('你要举报哪条？说清楚点儿。', { status: 400 });
     }
 
-    const message = await env.FEEDBACK_KV.get(`msg:${messageId}`, { type: 'json' });
-    if (!message) {
+    const ps = env.DB.prepare('UPDATE messages SET reports = reports + 1 WHERE id = ?1 RETURNING *');
+    const { results } = await ps.bind(messageId).all();
+
+    if (results.length === 0) {
       return new Response('没找着这条消息啊。', { status: 404 });
     }
-
-    message.reports = (message.reports || 0) + 1;
-    await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
     
-    // 如果配置了邮件服务，就发个邮件通知管理员。
+    const message = results[0];
+
     const htmlContent = `
         <h1>消息举报通知</h1>
         <p>一条消息被举报了，请及时处理：</p>
@@ -566,20 +481,19 @@ async function handleReport(request, env) {
       console.error("邮件发送失败：没配好环境变量 (RESEND_API_KEY, SENDER_EMAIL, RECIPIENT_EMAIL)。");
     }
 
-    const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
+    const response = new Response(JSON.stringify({ success: true, message }), { headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
-    console.error("处理举报时发生严重错误:", e.stack);
+    console.error("处理举报时发生严重错误 (D1):", e.stack);
     const errorResponse = new Response(JSON.stringify({ error: '处理举报时发生未知错误，请联系管理员。' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
-// --- API 处理器：设置消息标签 ---
+// --- API 处理器：设置消息标签 (D1 版本) ---
 async function handleTag(request, env) {
   try {
-    // 查岗，管理员专属功能。
     const authHeader = request.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response('没带通行证，禁止入内！', { status: 401 });
@@ -596,48 +510,24 @@ async function handleTag(request, env) {
       return new Response('要给哪条消息设置啥标签？说清楚点儿。', { status: 400 });
     }
 
-    const message = await env.FEEDBACK_KV.get(`msg:${messageId}`, { type: 'json' });
-    if (!message) {
+    const ps = env.DB.prepare('UPDATE messages SET tag = ?1 WHERE id = ?2 RETURNING *');
+    const { results } = await ps.bind(tag, messageId).all();
+    
+    if (results.length === 0) {
       return new Response('没找着这条消息啊。', { status: 404 });
     }
 
-    const oldTag = message.tag;
-    if (oldTag === tag) {
-      // 标签没变，就别瞎忙活了。
-      const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
-      return handleCorsAndRespond(request, response, env);
-    }
-
-    // 更新消息里的标签。
-    message.tag = tag;
-    await env.FEEDBACK_KV.put(`msg:${messageId}`, JSON.stringify(message));
-
-    // 更新索引，这是个细致活儿：先从旧标签的索引里删掉，再加到新标签的索引里。
-    if (oldTag) {
-        const oldTagIndexKey = `index_tag_${oldTag}`;
-        const oldTagIndexData = await env.FEEDBACK_KV.get(oldTagIndexKey, { type: 'json' });
-        if (oldTagIndexData) {
-            const updatedOldIndex = oldTagIndexData.filter(id => id !== messageId);
-            await env.FEEDBACK_KV.put(oldTagIndexKey, JSON.stringify(updatedOldIndex));
-        }
-    }
-    const newTagIndexKey = `index_tag_${tag}`;
-    const newTagIndexData = await env.FEEDBACK_KV.get(newTagIndexKey, { type: 'json' });
-    const newTagIndex = newTagIndexData || [];
-    newTagIndex.unshift(messageId);
-    await env.FEEDBACK_KV.put(newTagIndexKey, JSON.stringify(newTagIndex));
-
-    const response = new Response(JSON.stringify({ success: true, message: message }), { headers: { 'Content-Type': 'application/json' } });
+    const response = new Response(JSON.stringify({ success: true, message: results[0] }), { headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, response, env);
 
   } catch (e) {
+    console.error("设置标签时翻车了 (D1):", e);
     const errorResponse = new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     return handleCorsAndRespond(request, errorResponse, env);
   }
 }
 
 // --- API 处理器：获取前端公共配置 ---
-// 把一些需要公开给前端，但又可能变化的配置（比如 Turnstile 的 Site Key）放这里。
 async function getConfig(request, env) {
   const config = {
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
