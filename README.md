@@ -57,28 +57,25 @@ cd NekoInbox
 
 ### 3. 部署后端 (Cloudflare Worker)
 
-后端服务是整个系统的核心，负责处理数据和逻辑。我们将采用与前端一致的 GitOps 流程进行部署。
+后端服务是整个系统的核心，负责处理数据和逻辑。
 
 #### 步骤 1: 创建 Worker 并连接到 Git 仓库
 
-1.  访问 Cloudflare 仪表盘 -> `Workers & Pages` -> `Create application` -> `Workers` -> `Connect to Git`。
+1.  访问 Cloudflare 仪表盘 -> `Workers & Pages` -> `Workers` -> `Import a repository`。
 2.  选择你 Fork 的 `NekoInbox` 仓库。
-3.  在 **Build settings** 中：
-    - **Service name**: 为你的 Worker 服务起一个名字 (例如 `nekoinbox-api`)。
-    - **Production branch**: 保持 `main`。
-    - **Root directory**: 填入 `api`。这将告诉 Cloudflare 只关注 `api` 目录下的代码。
+3.  在 **Set up your application** 中：
+    - **Project name**: 为你的 Worker 服务起一个名字 (例如 `nekoinbox-api`)。
 4.  点击 `Save and Deploy`。Cloudflare 会自动为你创建 Worker 并完成首次部署。
 
 #### 步骤 2: 创建并绑定 KV 数据库
 
 我们需要一个 KV 命名空间来存储所有的反馈数据。
 
-1.  在 Cloudflare 仪表盘，进入 `Workers & Pages`，选择刚刚创建的 Worker。
-2.  进入 `Settings` -> `Variables`。
-3.  找到 **KV Namespace Bindings** 部分，点击 `Add binding`。
-4.  **Variable name**: 填入 `FEEDBACK_KV`。
-5.  **KV namespace**: 点击下拉菜单，选择 `Create a new namespace`，输入一个名字 (例如 `NekoInbox_Data`) 并创建。
-6.  点击 `Save`。这样，Worker 代码中的 `env.FEEDBACK_KV` 就能正确地访问到这个数据库了。
+1.  在 Cloudflare 仪表盘，进入 `Storage & Databases`，选择KV。
+2.  点击**Create Instance**，起**Namespace name**为`FEEDBACK_KV`
+3.  在 Cloudflare 仪表盘，进入 `Workers & Pages`，选择刚刚创建的 Worker。
+4.  找到 **KV Namespace**，点击 `Add binding`
+5.  **Variable name**填`FEEDBACK_KV`，**KV namespace**选择刚刚创建的KV库，随后点击`Add Bingding`
 
 #### 步骤 3: 创建 Turnstile 小组件
 
@@ -157,9 +154,8 @@ NEKOINBOX_FRONTEND_URL="https://your-project.pages.dev"
 ├── CONTRIBUTING.md           # 贡献指南
 ├── LICENSE                   # MIT 许可证
 ├── README.md                 # 项目主说明文档
-├── api/
-│   ├── worker.js             # Cloudflare Worker 的核心后端逻辑
-│   └── wrangler.toml         # Worker 配置文件 (服务名称, KV绑定等)
+├── worker.js                 # Cloudflare Worker 的核心后端逻辑
+├── wrangler.toml             # Worker 配置文件 (服务名称, KV绑定等)
 ├── assets/                   # README 中使用的图片资源
 │   ├── 浅色.jpg
 │   └── 深色.jpg
