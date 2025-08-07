@@ -119,15 +119,15 @@ export default {
 
     // 一个超级迷你的“路由器”，根据请求方法和路径，把它交给对应的处理函数。
     const routes = {
-      'GET:/messages': getMessages,
-      'POST:/messages': postMessage,
-      'POST:/login': handleLogin,
-      'POST:/reply': handleReply,
-      'POST:/vote': handleVote,
-      'POST:/report': handleReport,
-      'DELETE:/messages': deleteMessage,
-      'POST:/tag': handleTag,
-      'GET:/config': getConfig,
+      'GET:/api/messages': getMessages,
+      'POST:/api/messages': postMessage,
+      'POST:/api/login': handleLogin,
+      'POST:/api/reply': handleReply,
+      'POST:/api/vote': handleVote,
+      'POST:/api/report': handleReport,
+      'DELETE:/api/messages': deleteMessage,
+      'POST:/api/tag': handleTag,
+      'GET:/api/config': getConfig,
     };
 
     const handler = routes[`${request.method}:${url.pathname}`];
