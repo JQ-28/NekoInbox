@@ -82,7 +82,9 @@ cd NekoInbox
 为了防止机器人滥用，我们需要配置人机验证。
 
 1.  访问 Cloudflare 仪表盘 -> `Turnstile`。
-2.  创建一个新的小组件，主机名填写你绑定的域名，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
+2.  创建一个新的小组件，小组件模式选择“托管”。
+3.  在 **主机名** 字段，**必须**填入你将要为前端页面绑定的自定义域名（例如 `feedback.yourdomain.com`）。
+4.  创建后，获取 **Site Key** 和 **Secret Key**。
 
 #### 步骤 4: 设置密钥
 
@@ -99,7 +101,7 @@ cd NekoInbox
 | `ADMIN_PASSWORD`        | (自定义)                                                         | 用于登录网页后台的密码。                   |
 | `JWT_SECRET`            | (自定义，一个长而随机的字符串)                                   | 用于签发管理员登录凭证的密钥。             |
 | `API_TOKEN`             | (自定义，一个长而随机的字符串)                                   | 用于 NoneBot 插件与后端通信的“暗号”。 （需要记下用于之后nonebot配置）     |
-| `FRONTEND_URL`          | (你的前端页面完整 URL)                                           | 你的前端访问地址，用于配置 CORS 策略。待后续前端配置完再填写     |
+| `FRONTEND_URL`          | (你的前端页面**自定义域名** URL)                                 | 你的前端最终访问地址，**必须**是为 Pages 绑定的自定义域名。用于配置 CORS 策略。 |
 | `RESEND_API_KEY`        | (可选)                                                           | Resend 服务的 API Key。                    |
 | `SENDER_EMAIL`          | (可选, 例如 `noreply@yourdomain.com`)                            | 发送提醒邮件的邮箱地址。                   |
 | `RECIPIENT_EMAIL`       | (可选, 你的接收邮箱)                                             | 接收举报通知的管理员邮箱。                 |
@@ -122,7 +124,9 @@ cd NekoInbox
         - **Variable name**: `API_BASE_URL`
         - **Variable value**: 填入你**第 3 步**部署的 Worker 的 URL (例如: `https://your-worker-name.your-username.workers.dev`)
     5.  点击 `Save and Deploy`。
-    6.  部署完成后，Cloudflare 会为你提供一个前端页面的 URL (例如 `https://your-project.pages.dev`)。请将此 URL 填入你**第 3 步**部署 Worker 时设置的 `FRONTEND_URL` 密钥中，以确保 CORS（跨域资源共享）策略正常工作。
+    6.  部署完成后，Cloudflare 会为你提供一个 `*.pages.dev` 的默认地址。但为了让 Turnstile 人机验证正常工作，**您必须为其绑定一个自定义域名**。
+    7.  进入刚刚创建的 Pages 项目，选择 `Custom domains` -> `Set up a domain`，然后按照指引，将您的域名（或子域名，如 `feedback.yourdomain.com`）绑定到此项目。
+    8.  绑定成功后，请将这个**自定义域名 URL** (例如 `https://feedback.yourdomain.com`) 填入你**第 3 步**部署 Worker 时设置的 `FRONTEND_URL` 密钥中，以确保 CORS 策略正常工作。
     
     > **它是如何工作的？**
     > 项目根目录下的 `functions` 文件夹是一个 [Cloudflare Pages Function](https://developers.cloudflare.com/pages/functions/)。Cloudflare 会自动识别并部署它。这个函数会在您的静态页面发送给用户之前，拦截请求，并将您在上面设置的 `API_BASE_URL` 环境变量动态地注入到 HTML 中。这样，前端代码就能自动获取到后端的正确地址，实现了零手动配置的部署。
