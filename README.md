@@ -124,6 +124,9 @@ cd NekoInbox
     5.  点击 `Save and Deploy`。
     6.  部署完成后，Cloudflare 会为你提供一个前端页面的 URL (例如 `https://your-project.pages.dev`)。请将此 URL 填入你**第 3 步**部署 Worker 时设置的 `FRONTEND_URL` 密钥中，以确保 CORS（跨域资源共享）策略正常工作。
     
+    > **它是如何工作的？**
+    > 项目根目录下的 `functions` 文件夹是一个 [Cloudflare Pages Function](https://developers.cloudflare.com/pages/functions/)。Cloudflare 会自动识别并部署它。这个函数会在您的静态页面发送给用户之前，拦截请求，并将您在上面设置的 `API_BASE_URL` 环境变量动态地注入到 HTML 中。这样，前端代码就能自动获取到后端的正确地址，实现了零手动配置的部署。
+    
     ### 5. 配置机器人插件 (NoneBot2)
 
 最后，让你的 NoneBot 机器人能够将收集到的消息发送到后端。
@@ -156,6 +159,8 @@ NEKOINBOX_FRONTEND_URL="https://your-project.pages.dev"
 ├── README.md                 # 项目主说明文档
 ├── worker.js                 # Cloudflare Worker 的核心后端逻辑
 ├── wrangler.toml             # Worker 配置文件 (服务名称, KV绑定等)
+├── functions/
+│   └── [[path]].js           # Cloudflare Pages Function, 用于动态注入环境变量
 ├── assets/                   # README 中使用的图片资源
 │   ├── 浅色.jpg
 │   └── 深色.jpg

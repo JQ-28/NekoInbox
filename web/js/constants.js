@@ -11,9 +11,9 @@ export const LOCAL_STORAGE_KEYS = {
 
 // 后端 API 接口路径
 export const API_ENDPOINTS = {
-    // 基础 API URL 从 index.html 中定义的全局变量 window.API_BASE_URL 获取。
-    // 如果该变量未定义或为空，则会提示用户在 index.html 中进行配置。
-    BASE_URL: window.API_BASE_URL || (alert('错误：未配置后端 API 地址！请根据 index.html 文件顶部的注释进行配置。'), ''),
+    // 基础 API URL 由 Cloudflare Pages Function 动态注入到 window.API_BASE_URL。
+    // 无需手动配置。
+    BASE_URL: window.API_BASE_URL,
     MESSAGES: '/api/messages',
     CONFIG: '/api/config',
     LOGIN: '/api/login',
