@@ -57,107 +57,59 @@ cd NekoInbox
 
 ### 3. 部署后端 (Cloudflare Worker)
 
-后端服务是整个系统的核心，负责处理数据和逻辑。
+后端服务是整个系统的核心，负责处理数据和逻辑。我们将采用与前端一致的 GitOps 流程进行部署。
 
-#### 步骤 1: 安装 Wrangler CLI
+#### 步骤 1: 创建 Worker 并连接到 Git 仓库
 
-Wrangler 是 Cloudflare 的官方命令行工具，用于管理 Workers。
-```bash
-npm install -g wrangler
-```
-登录到你的 Cloudflare 账户：
-```bash
-wrangler login
-```
+1.  访问 Cloudflare 仪表盘 -> `Workers & Pages` -> `Create application` -> `Workers` -> `Connect to Git`。
+2.  选择你 Fork 的 `NekoInbox` 仓库。
+3.  在 **Build settings** 中：
+    - **Service name**: 为你的 Worker 服务起一个名字 (例如 `nekoinbox-api`)。
+    - **Production branch**: 保持 `main`。
+    - **Root directory**: 填入 `api`。这将告诉 Cloudflare 只关注 `api` 目录下的代码。
+4.  点击 `Save and Deploy`。Cloudflare 会自动为你创建 Worker 并完成首次部署。
 
-#### 步骤 2: 创建 KV 数据库
+#### 步骤 2: 创建并绑定 KV 数据库
 
 我们需要一个 KV 命名空间来存储所有的反馈数据。
-```bash
-wrangler kv namespace create "FEEDBACK_KV"
-```
-如果没出问题那么命令行会输出类似于下面的效果
-```bash
- ⛅️ wrangler 4.27.0 (update available 4.28.0)
-─────────────────────────────────────────────
-Resource location: remote
-🌀 Creating namespace with title "FEEDBACK_KV"
-✨ Success!
-Add the following to your configuration file in your kv_namespaces array:
-{
-  "kv_namespaces": [
-    {
-      "binding": "FEEDBACK_KV",
-      "id": "你的KV数据库id"
-    }
-  ]
-}
-```
 
+1.  在 Cloudflare 仪表盘，进入 `Workers & Pages`，选择刚刚创建的 Worker。
+2.  进入 `Settings` -> `Variables`。
+3.  找到 **KV Namespace Bindings** 部分，点击 `Add binding`。
+4.  **Variable name**: 填入 `FEEDBACK_KV`。
+5.  **KV namespace**: 点击下拉菜单，选择 `Create a new namespace`，输入一个名字 (例如 `NekoInbox_Data`) 并创建。
+6.  点击 `Save`。这样，Worker 代码中的 `env.FEEDBACK_KV` 就能正确地访问到这个数据库了。
 
-#### 步骤 3: 配置 `wrangler.toml`
-
-打开 `api/wrangler.toml` 文件，进行如下修改：
-1.  将上一步中输出的生产环境 `id` 填入 `[[kv_namespaces]]` 部分的 `id` 字段。
-2.  (可选) 修改 `name` 字段为你喜欢的 Worker 名称。
-
-#### 步骤 4: 创建 Turnstile 小组件
+#### 步骤 3: 创建 Turnstile 小组件
 
 为了防止机器人滥用，我们需要配置人机验证。
+
 1.  访问 Cloudflare 仪表盘 -> `Turnstile`。
-2.  创建一个新的小组件，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
+2.  创建一个新的小组件，域名填写你**第 4 步**部署的前端页面地址，小组件模式选择“托管”，获取 **Site Key** 和 **Secret Key**。
 
-#### 步骤 5: 设置密钥并发布 Worker
+#### 步骤 4: 设置密钥
 
-**这是最重要的一步。** 为了安全，所有敏感信息都必须通过 `secret` 命令设置，**不要直接写入 `.toml` 文件**。
+**这是最重要的一步。** 为了安全，所有敏感信息都必须在 Worker 的设置中配置为密钥。
 
-在项目根目录的终端中，依次执行以下命令，并根据提示输入你准备好的值：
+1.  回到你的 Worker 设置页面 (`Settings` -> `Variables`)。
+2.  找到 **Environment Variables** 部分，点击 `Add variable`，然后选择 `Encrypt` 来添加加密密钥。
+3.  根据下表，依次添加所有必需的密钥：
 
-```bash
-# 进入 api 目录
-cd api
+| 变量名                  | 值                                                               | 描述                                       |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| `TURNSTILE_SECRET_KEY`  | (从上一步获取)                                                   | Turnstile 的 Secret Key。                  |
+| `TURNSTILE_SITE_KEY`    | (从上一步获取)                                                   | Turnstile 的 Site Key，会公开给前端。      |
+| `ADMIN_PASSWORD`        | (自定义)                                                         | 用于登录网页后台的密码。                   |
+| `JWT_SECRET`            | (自定义，一个长而随机的字符串)                                   | 用于签发管理员登录凭证的密钥。             |
+| `API_TOKEN`             | (自定义，一个长而随机的字符串)                                   | 用于 NoneBot 插件与后端通信的“暗号”。      |
+| `FRONTEND_URL`          | (你的前端页面完整 URL)                                           | 你的前端访问地址，用于配置 CORS 策略。     |
+| `RESEND_API_KEY`        | (可选)                                                           | Resend 服务的 API Key。                    |
+| `SENDER_EMAIL`          | (可选, 例如 `noreply@yourdomain.com`)                            | 发送提醒邮件的邮箱地址。                   |
+| `RECIPIENT_EMAIL`       | (可选, 你的接收邮箱)                                             | 接收举报通知的管理员邮箱。                 |
 
-# 1. Turnstile 密钥 (从上一步获取)
-wrangler secret put TURNSTILE_SECRET_KEY
-```
+4.  每添加一个密钥后，记得点击 `Save`。
 
-> **💡 提示**
-> 当你第一次执行 `wrangler secret put` 时，如果 Worker 服务还不存在，`wrangler` 会智能地询问你是否要现在创建一个。请输入 `y` 并回车确认，它会自动帮你完成 Worker 的初始化创建。
-
-接下来，继续设置其他的密钥：
-
-```bash
-# 2. 前端页面公开的 Site Key
-wrangler secret put TURNSTILE_SITE_KEY
-# 注意：虽然此 Key 是公开的，但为了统一管理，也建议用 secret 设置
-
-# 3. 管理员密码 (用于登录网页后台)
-wrangler secret put ADMIN_PASSWORD
-
-# 4. JWT 密钥 (用于签发管理员登录凭证，输入一个长而随机的字符串)
-wrangler secret put JWT_SECRET
-
-# 5. API 访问令牌 (用于 NoneBot 插件与后端通信，输入一个长而随机的字符串)
-wrangler secret put API_TOKEN
-
-# 6. 你的前端页面访问地址
-wrangler secret put FRONTEND_URL
-
-# 7. (可选) Resend 邮件提醒，用于接收举报通知
-# wrangler secret put RESEND_API_KEY
-# wrangler secret put SENDER_EMAIL
-# wrangler secret put RECIPIENT_EMAIL
-```
-
-#### 步骤 6: 部署 Worker
-
-所有密钥都设置好后，执行部署命令，将你的代码上传到 Cloudflare。
-
-```bash
-wrangler deploy
-```
-
-部署成功后，你的后端服务就正式上线了！后续对 `worker.js` 的任何修改，都需要重新执行 `wrangler deploy` 来使其生效。
+部署成功后，你的后端服务就正式上线了！后续对 `api/worker.js` 的任何修改，只需要推送到 GitHub，Cloudflare 就会自动帮你完成部署。
 
 ### 4. 部署前端 (Cloudflare Pages)
 
