@@ -1,10 +1,12 @@
 # NekoInbox - 用户反馈与建议插件
 
 [![](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![](https://img.shields.io/badge/Powered%20by-Cloudflare-orange.svg)](https://www.cloudflare.com/)
-[![](https://img.shields.io/badge/Made%20with-Love-red.svg)](https://github.com/JQ-28/NekoInbox)
+[![](https://img.shields.io/badge/NoneBot-v2-red.svg)](https://v2.nonebot.dev/)
+[![](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![](https://img.shields.io/badge/Cloudflare-Workers%20|%20Pages%20|%20D1-orange.svg)](https://www.cloudflare.com/)
+[![](https://img.shields.io/badge/JavaScript-ES6+-yellow.svg)](https://www.ecma-international.org/)
 
-这是一个全栈项目，旨在通过 NoneBot2 机器人收集用户的反馈与建议，并将其展示在一个美观、交互性强的网页上。网页由 Cloudflare Pages 和 Workers 驱动，数据存储在 **Cloudflare D1** 数据库中，实现了高性能的数据展示、排序、管理等功能。
+这是一个 **NoneBot2 + Cloudflare** 全栈项目，旨在通过机器人收集用户的反馈与建议，并将其展示在一个美观、交互性强的网页上。网页由 **Cloudflare Pages** 和 **Workers** 驱动，数据存储在 **Cloudflare D1** 数据库中，实现了高性能的数据展示、排序、管理等功能。
 
 ## 🌐 在线体验
 
@@ -17,6 +19,78 @@
 - **高性能数据库**: 使用 **Cloudflare D1 (SQLite-based)** 作为数据存储，支持复杂的 SQL 查询，从根本上保证了搜索和排序的性能。
 - **功能完善**: 支持建议/反馈提交、**点赞/点踩**、**举报**、管理员**回复/删除/设置标签**等。
 - **安全可靠**: 使用 JWT 进行管理员权限验证，并集成了 **Cloudflare Turnstile** 人机验证。
+
+---
+
+## 🏛️ 架构总览
+
+本项目采用前后端分离的现代化架构，各组件职责分明，清晰高效。
+
+```mermaid
+graph TD
+    subgraph User End
+        A[用户/QQ群]
+    end
+
+    subgraph Bot End
+        B[NoneBot 插件]
+    end
+
+    subgraph Cloudflare Platform
+        C[Cloudflare Worker]
+        D[Cloudflare D1 Database]
+        E[Cloudflare Pages]
+        F[Cloudflare Turnstile]
+    end
+    
+    A -- "#反馈/建议" --> B
+    B -- "POST /api/messages\n(携带 API_TOKEN)" --> C
+    C -- "SQL 查询/写入" <--> D
+    E -- "HTML/CSS/JS" --> G[访客浏览器]
+    G -- "GET /api/messages" --> C
+    G -- "POST /api/vote\n(携带 Turnstile Token)" --> C
+    F -- "人机验证" --> G
+```
+
+## 📂 项目结构
+
+为了方便您快速定位代码，以下是本项目的核心文件与目录结构说明：
+
+```
+NekoInbox/
+├── 📂 nonebot_plugin_nekoinbox/  # NoneBot2 插件端
+│   └── __init__.py              # 插件核心逻辑，负责接收QQ消息并发送到 Worker
+├── 📂 web/                        # 前端静态文件 (由 Cloudflare Pages 托管)
+│   ├── index.html               # 页面主结构
+│   ├── css/style.css            # 样式表
+│   └── js/                      # JavaScript 逻辑
+│       ├── main.js              # 页面主逻辑，负责初始化、加载消息
+│       ├── api.js               # 封装所有与后端 Worker 的通信
+│       ├── ui.js                # 负责所有 DOM 操作和 UI 渲染
+│       ├── events.js            # 集中处理所有用户交互事件
+│       └── constants.js         # 全局常量
+├── 📂 functions/
+│   └── [[path]].js              # Pages 中间件，用于向 HTML 动态注入环境变量
+├── worker.js                    # Cloudflare Worker 核心，应用的“大脑”
+├── schema.sql                   # D1 数据库的表结构定义文件
+└── wrangler.toml                # Cloudflare Worker 的配置文件
+```
+
+## 📡 API 端点
+
+`worker.js` 提供了以下核心 API 端点供前端调用：
+
+| 方法   | 路径                  | 描述                                     | 是否需要认证 |
+| :----- | :-------------------- | :--------------------------------------- | :----------- |
+| `GET`  | `/api/messages`       | 获取消息列表（支持分页、搜索、排序）     | 否           |
+| `POST` | `/api/messages`       | (机器人端) 提交新的反馈/建议             | `API_TOKEN`  |
+| `GET`  | `/api/config`         | 获取前端所需的公共配置（如 Turnstile Site Key） | 否           |
+| `POST` | `/api/login`          | 管理员登录                               | 否           |
+| `POST` | `/api/vote`           | 为消息点赞或点踩                         | Turnstile    |
+| `POST` | `/api/report`         | 举报一条消息                             | Turnstile    |
+| `DELETE` | `/api/messages`     | (管理员) 删除一条消息                    | JWT          |
+| `POST` | `/api/tag`            | (管理员) 为消息设置标签                  | JWT          |
+| `POST` | `/api/reply`          | (管理员) 回复一条消息                    | JWT          |
 
 ---
 
