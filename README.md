@@ -36,7 +36,7 @@
     - **Fork** 本项目到您的 GitHub 账户。
     - **克隆**您 Fork 的仓库到本地：
       ```bash
-      git clone https://github.com/YOUR_USERNAME/NekoInbox.git
+      git clone https://github.com/JQ-28/NekoInbox.git
       cd NekoInbox
       ```
 3.  **安装并授权命令行工具**:
