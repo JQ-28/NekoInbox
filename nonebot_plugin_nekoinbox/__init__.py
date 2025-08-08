@@ -11,9 +11,9 @@ __plugin_meta__ = PluginMetadata(
     name="用户反馈与建议",
     description="一个用于收集用户反馈和建议，并展示在网页上的插件",
     usage="""
-    #反馈 [内容]
-    #建议 [内容]
-    #投信 [内容]
+    反馈 [内容]
+    建议 [内容]
+    投信 [内容]
     """,
 )
 
@@ -44,9 +44,9 @@ async_client = httpx.AsyncClient(timeout=15.0)
 # --- 命令响应器 ---
 # 定义三个命令，分别处理用户的反馈、建议和投信。
 # 优先级设为 10，block=True 表示同一时间只处理一个命令，防止混淆。
-feedback_matcher = on_command("#反馈", priority=10, block=True)
-suggestion_matcher = on_command("#建议", priority=10, block=True)
-submission_matcher = on_command("#投信", priority=10, block=True)
+feedback_matcher = on_command("反馈", priority=10, block=True)
+suggestion_matcher = on_command("建议", priority=10, block=True)
+submission_matcher = on_command("投信", priority=10, block=True)
 
 
 async def process_message(matcher: Matcher, bot: Bot, event: Event, args: Message, msg_type: str):
@@ -102,19 +102,19 @@ async def process_message(matcher: Matcher, bot: Bot, event: Event, args: Messag
 
 @feedback_matcher.handle()
 async def handle_feedback(matcher: Matcher, bot: Bot, event: Event, args: Message = CommandArg()):
-    """处理“#反馈”命令"""
+    """处理“反馈”命令"""
     await process_message(matcher, bot, event, args, "feedback")
 
 
 @suggestion_matcher.handle()
 async def handle_suggestion(matcher: Matcher, bot: Bot, event: Event, args: Message = CommandArg()):
-    """处理“#建议”命令"""
+    """处理“建议”命令"""
     await process_message(matcher, bot, event, args, "suggestion")
 
 
 @submission_matcher.handle()
 async def handle_submission(matcher: Matcher, bot: Bot, event: Event, args: Message = CommandArg()):
-    """处理“#投信”命令"""
+    """处理“投信”命令"""
     await process_message(matcher, bot, event, args, "message")
 
 
