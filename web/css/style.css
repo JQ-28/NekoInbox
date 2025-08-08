@@ -175,7 +175,7 @@ h1 {
     background-size: 300% auto;
     animation: animated-gradient 8s ease infinite;
     border: none;
-    color: #8a6bb5;
+    /* color: #8a6bb5; */ /* Color is now set directly on the SVG fill */
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -184,6 +184,7 @@ h1 {
 .header-icon-btn svg {
     width: 24px;
     height: 24px;
+    fill: #8a6bb5; /* Explicitly set the icon color */
 }
 
 /* --- [CSS Grid Masonry] 留言板与卡片 --- */
@@ -1688,7 +1689,11 @@ body.dark-mode #admin-login-btn.admin-logged-in:hover {
 
 body.dark-mode .header-icon-btn {
     background-image: linear-gradient(135deg, #1E90FF, #FF69B4, #87CEFA);
-    color: #FFFFFF;
+    /* color: #FFFFFF; */ /* Color is now set directly on the SVG fill */
+}
+
+body.dark-mode .header-icon-btn svg {
+    fill: #FFFFFF;
 }
 
 body.dark-mode .modal-content {
