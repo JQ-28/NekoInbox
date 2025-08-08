@@ -45,7 +45,7 @@
     - **Fork** 本项目到您的 GitHub 账户。
     - **克隆**您 Fork 的仓库到本地：
       ```bash
-      git clone https://github.com/YOUR_USERNAME/NekoInbox.git
+      git clone https://github.com/JQ-28/NekoInbox.git
       cd NekoInbox
       ```
 3.  **安装并授权命令行工具**:
@@ -101,6 +101,8 @@
 ### 第 4 部分：最终配置：连接一切
 
 **目标**: 配置域名、安全密钥和环境变量，将前后端安全地连接起来。
+
+> **⚠️ 重要提示**: 此步骤中的配置顺序至关重要。请确保严格遵循：**`1. 绑定前端自定义域名`** -> **`2. 创建 Turnstile 并使用该域名`** -> **`3. 在 Worker 环境变量中配置该域名`**。这三者必须完全一致，否则安全验证将失败。
 
 1.  **绑定前端自定义域名**:
     - 进入**第 3 部分**创建的 Pages 项目 → `Custom domains` → `Set up a domain`。
