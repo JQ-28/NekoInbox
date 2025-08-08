@@ -6,7 +6,9 @@ import { API_ENDPOINTS, LOCAL_STORAGE_KEYS } from './constants.js';
 
 const BASE_URL = API_ENDPOINTS.BASE_URL;
 let authToken = sessionStorage.getItem(LOCAL_STORAGE_KEYS.AUTH_TOKEN);
-let turnstileToken = null;
+
+// [REMOVED] 不再需要模块级变量来存储 turnstile token
+// let turnstileToken = null;
 
 export function setAuthToken(token) {
     authToken = token;
@@ -16,9 +18,10 @@ export function getAuthToken() {
     return authToken;
 }
 
-export function setTurnstileToken(token) {
-    turnstileToken = token;
-}
+// [REMOVED] setTurnstileToken 函数不再需要，因为我们将动态获取 token
+// export function setTurnstileToken(token) {
+//     turnstileToken = token;
+// }
 
 export async function fetchMessages(page = 1, limit = 10, sortBy = 'likes', filterByTag = 'all', searchTerm = '') {
     let apiUrl = `${BASE_URL}${API_ENDPOINTS.MESSAGES}?page=${page}&limit=${limit}&sortBy=${sortBy}&filterByTag=${filterByTag}`;
@@ -48,6 +51,8 @@ export async function login(password) {
 export async function handleVote(messageId, voteType) {
     if (localStorage.getItem(`${LOCAL_STORAGE_KEYS.VOTED_PREFIX}${messageId}`)) return;
 
+    // [MODIFIED] 直接从 window.turnstile 获取最新的 token
+    const turnstileToken = window.turnstile?.getResponse();
     if (!turnstileToken) {
         showToast('人机验证无效，请刷新页面重试。', 'error');
         return null;
@@ -70,6 +75,8 @@ export async function handleVote(messageId, voteType) {
 export async function handleReport(messageId) {
     if (localStorage.getItem(`${LOCAL_STORAGE_KEYS.REPORTED_PREFIX}${messageId}`)) return;
 
+    // [MODIFIED] 直接从 window.turnstile 获取最新的 token
+    const turnstileToken = window.turnstile?.getResponse();
     if (!turnstileToken) {
         showToast('人机验证无效，请刷新页面重试。', 'error');
         return null;

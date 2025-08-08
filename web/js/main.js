@@ -1,4 +1,4 @@
-import { fetchMessages, fetchConfig, setTurnstileToken } from './api.js';
+import { fetchMessages, fetchConfig } from './api.js';
 import { renderMessages, showLoader, hideLoader, clearMessageBoard, resizeGridItems, updateLoginButtonState, renderSkeleton } from './ui.js';
 import { initializeEventListeners } from './events.js';
 import { LOCAL_STORAGE_KEYS, DEFAULTS } from './constants.js';
@@ -75,7 +75,8 @@ async function start() {
             window.turnstile.render('#turnstile-widget-container', {
                 sitekey: config.turnstileSiteKey,
                 callback: function(token) {
-                    setTurnstileToken(token);
+                    // [MODIFIED] 不再需要 setTurnstileToken，但回调本身仍然重要
+                    // 它标志着人机验证已成功，我们可以开始加载页面内容了
                     turnstileModal.style.display = 'none';
                     initializePage();
                 },

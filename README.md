@@ -80,7 +80,7 @@
 **目标**: 创建并部署前端静态页面。
 
 1.  **创建 Pages 项目**:
-    - 访问 [Cloudflare 仪表盘](https://dash.cloudflare.com/) → `Workers & Pages` → `Create application` → `Pages` → `Connect to Git`。
+    - 访问 [Cloudflare 仪表盘](https://dash.cloudflare.com/) → `Workers & Pages` → `Create` → `Pages` → `Import an existing Git repository`。
     - 选择您 Fork 的 `NekoInbox` 仓库。
 2.  **配置并部署**:
     - **Framework preset**: `None`
@@ -95,17 +95,19 @@
 **目标**: 配置域名、安全密钥和环境变量，将前后端安全地连接起来。
 
 1.  **绑定前端自定义域名**:
-    - 进入**第 3 部分**创建的 Pages 项目 → `Custom domains` → `Set up a domain`。
+    - 进入**第 3 部分**创建的 Pages 项目 → `Custom domains` → `Set up a custom domain`。
     - 将您的**自定义域名** (例如 `feedback.yourdomain.com`) 绑定到此项目。
 2.  **创建 Turnstile 安全密钥**:
-    - 访问 [Cloudflare 仪表盘](https://dash.cloudflare.com/) → `Turnstile` → `Add site`。
-    - **Domain**: **必须**填入您上一步绑定的**自定义域名**。
+    - 访问 [Cloudflare 仪表盘](https://dash.cloudflare.com/) → `Turnstile` → `Add Widget`。
+    - **Widget name**：填入你想起的名字（）
+    - **Hostnames**: **必须**填入您上一步绑定的**自定义域名**。
+    - **Widget Mode**：选择`Managed`
     - 创建后，分别**复制**并临时保存好 **Site Key** 和 **Secret Key**。
 3.  **配置后端环境变量 (命令行)**:
     - 回到您的本地项目终端。
     - 逐一执行以下命令，将 `<...>` 部分替换为您自己的值。`wrangler` 会自动加密这些密钥并上传。
       ```bash
-      # 您的前端自定义域名
+      # 您的前端自定义域名（例如 https://feedback.yourdomain.com）
       wrangler secret put FRONTEND_URL
       # 从 Turnstile 获取的 Secret Key
       wrangler secret put TURNSTILE_SECRET_KEY
@@ -115,7 +117,7 @@
       wrangler secret put ADMIN_PASSWORD
       # 自定义的、长而随机的字符串
       wrangler secret put JWT_SECRET
-      # 自定义的、长而随机的字符串 (用于机器人)
+      # 自定义的、长而随机的字符串 (用于nonebot机器人,请记下用于之后机器人配置)
       wrangler secret put API_TOKEN
       # (可选) Resend 服务的 API Key
       wrangler secret put RESEND_API_KEY
@@ -125,10 +127,11 @@
       wrangler secret put RECIPIENT_EMAIL
       ```
 4.  **配置前端环境变量**:
-    - 回到**第 3 部分**创建的 Pages 项目 → `Settings` → `Environment variables`。
-    - 点击 `Add variable`。
+    - 回到**第 3 部分**创建的 Pages 项目 → `Settings` → `Variables and Secrets`。
+    - 点击 `Add`。
+    - **Type**：`Secret`
     - **Variable name**: `API_BASE_URL`
-    - **Variable value**: 填入**第 2 部分**部署的 Worker 的 URL (例如: `https://nekoinbox-api.your-username.workers.dev`)。
+    - **Value**: 填入**第 2 部分**部署的 Worker 的 URL (例如: `https://nekoinbox-api.your-username.workers.dev`)。
 
 > ✅ **Web 服务完全配置成功**！
 
