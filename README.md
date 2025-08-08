@@ -44,7 +44,7 @@
     # 安装 Cloudflare Wrangler
     npm install wrangler
     # 登录并授权 Wrangler
-    npx wrangler login
+    wrangler login
     ```
 
 ### 第 2 部分：后端部署 (纯命令行)
@@ -53,7 +53,7 @@
 
 1.  **创建 D1 数据库**:
     ```bash
-    npx wrangler d1 create neko-inbox-db
+    wrangler d1 create neko-inbox-db
     ```
     运行后，终端会输出一段 `[[d1_databases]]` 配置块。**请复制这段配置**。
 
@@ -65,12 +65,12 @@
 3.  **初始化数据库表**:
     使用 `--remote` 参数，直接在 Cloudflare 云端的数据库上执行初始化。
     ```bash
-    npx wrangler d1 execute neko-inbox-db --remote --file=schema.sql
+    wrangler d1 execute neko-inbox-db --remote --file=schema.sql
     ```
 4.  **部署 Worker**:
     此命令会将 `worker.js` 中的代码部署到 Cloudflare，并根据 `wrangler.toml` 中的配置自动绑定 D1 数据库。
     ```bash
-    npx wrangler deploy
+    wrangler deploy
     ```
 
 > ✅ **后端服务已就绪**。它已通过命令行成功部署并连接到数据库。
@@ -106,23 +106,23 @@
     - 逐一执行以下命令，将 `<...>` 部分替换为您自己的值。`wrangler` 会自动加密这些密钥并上传。
       ```bash
       # 您的前端自定义域名
-      npx wrangler secret put FRONTEND_URL
+      wrangler secret put FRONTEND_URL
       # 从 Turnstile 获取的 Secret Key
-      npx wrangler secret put TURNSTILE_SECRET_KEY
+      wrangler secret put TURNSTILE_SECRET_KEY
       # 从 Turnstile 获取的 Site Key
-      npx wrangler secret put TURNSTILE_SITE_KEY
+      wrangler secret put TURNSTILE_SITE_KEY
       # 您自定义的管理员密码
-      npx wrangler secret put ADMIN_PASSWORD
+      wrangler secret put ADMIN_PASSWORD
       # 自定义的、长而随机的字符串
-      npx wrangler secret put JWT_SECRET
+      wrangler secret put JWT_SECRET
       # 自定义的、长而随机的字符串 (用于机器人)
-      npx wrangler secret put API_TOKEN
+      wrangler secret put API_TOKEN
       # (可选) Resend 服务的 API Key
-      npx wrangler secret put RESEND_API_KEY
+      wrangler secret put RESEND_API_KEY
       # (可选) 发送邮件的地址
-      npx wrangler secret put SENDER_EMAIL
+      wrangler secret put SENDER_EMAIL
       # (可选) 接收邮件的地址
-      npx wrangler secret put RECIPIENT_EMAIL
+      wrangler secret put RECIPIENT_EMAIL
       ```
 4.  **配置前端环境变量**:
     - 回到**第 3 部分**创建的 Pages 项目 → `Settings` → `Environment variables`。
