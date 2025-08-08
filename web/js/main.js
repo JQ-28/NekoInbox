@@ -66,34 +66,41 @@ export async function initializePage() {
     window.addEventListener('resize', resizeGridItems);
 }
 
-async function start() {
+window.turnstileCallback = async function () {
     const turnstileModal = document.getElementById('turnstile-modal');
+    const loadingText = document.querySelector('.turnstile-loading');
+    const container = document.getElementById('turnstile-widget-container');
+
     turnstileModal.style.display = 'flex';
+
     try {
         const config = await fetchConfig();
         if (config.turnstileSiteKey && window.turnstile) {
+            if(loadingText) loadingText.style.display = 'none';
+            
             window.turnstile.render('#turnstile-widget-container', {
                 sitekey: config.turnstileSiteKey,
                 callback: function(token) {
-                    // [MODIFIED] 不再需要 setTurnstileToken，但回调本身仍然重要
-                    // 它标志着人机验证已成功，我们可以开始加载页面内容了
                     turnstileModal.style.display = 'none';
                     initializePage();
                 },
+                'error-callback': function() {
+                    if(container) {
+                        container.innerHTML = `<p class="error">抱歉，人机验证组件渲染失败，请检查网络连接或刷新重试。</p>`;
+                    }
+                }
             });
-            const loadingText = document.querySelector('.turnstile-loading');
-            if(loadingText) loadingText.style.display = 'none';
         } else {
             throw new Error('Turnstile Site Key 未配置或 Turnstile 脚本加载失败');
         }
     } catch (error) {
         console.error('Turnstile 初始化失败:', error);
-        const container = document.getElementById('turnstile-widget-container');
+        if(loadingText) loadingText.style.display = 'none';
         if(container) {
             container.innerHTML = `<p class="error">人机验证加载失败，请刷新页面或联系管理员。</p>`;
         }
     }
-}
+};
 
 export function getCurrentFilters() {
     const searchTerm = searchInput.value.trim();
@@ -195,5 +202,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     initializeEventListeners();
-    start();
+    // Turnstile 的加载由 onload 回调 `turnstileCallback` 触发，不再需要 start()
 });
