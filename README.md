@@ -64,9 +64,10 @@
     ```bash
     npx wrangler d1 create neko-inbox-db
     ```
-2.  **初始化数据库表**:
+2.  **初始化数据库表 (在远程)**:
+    使用 `--remote` 参数，直接在 Cloudflare 云端的数据库上执行初始化。
     ```bash
-    npx wrangler d1 execute neko-inbox-db --file=schema.sql
+    npx wrangler d1 execute neko-inbox-db --remote --file=schema.sql
     ```
 3.  **创建 Worker 服务**:
     - 访问 [Cloudflare 仪表盘](https://dash.cloudflare.com/) → `Workers & Pages` → `Create application` → `Create Worker`。
