@@ -166,24 +166,40 @@ h1 {
 }
 
 .header-icon-btn {
+    position: relative;
     display: inline-flex;
     justify-content: center;
     align-items: center;
     width: 40px;
     height: 40px;
-    background-image: linear-gradient(135deg, #e6d6f6, #f8e0f8, #c8e8f8, #f8e0f8, #e6d6f6);
-    background-size: 300% auto;
-    animation: animated-gradient 8s ease infinite;
+    background-color: #8a6bb5; /* [REFINED] Use a solid color for the icon mask */
     border: none;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s ease;
+    overflow: hidden; /* [REFINED] Hide overflowing pseudo-element */
+}
+
+.header-icon-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(135deg, #e6d6f6, #f8e0f8, #c8e8f8, #f8e0f8, #e6d6f6);
+    background-size: 300% auto;
+    animation: animated-gradient 8s ease infinite;
+    z-index: 1;
+    transition: opacity 0.3s ease;
 }
 
 .header-icon-btn svg {
+    position: relative;
+    z-index: 2;
     width: 24px;
     height: 24px;
-    fill: #8a6bb5; /* [ULTIMATE FIX] Directly control the SVG fill color */
+    fill: #fff; /* [REFINED] The icon itself should be white to punch through the mask */
 }
 
 /* --- [CSS Grid Masonry] 留言板与卡片 --- */
@@ -1687,11 +1703,15 @@ body.dark-mode #admin-login-btn.admin-logged-in:hover {
 }
 
 body.dark-mode .header-icon-btn {
+    background-color: #a991d4; /* [REFINED] Dark mode solid color */
+}
+
+body.dark-mode .header-icon-btn::before {
     background-image: linear-gradient(135deg, #1E90FF, #FF69B4, #87CEFA);
 }
 
 body.dark-mode .header-icon-btn svg {
-    fill: #FFFFFF; /* [ULTIMATE FIX] Directly control the SVG fill color in dark mode */
+    fill: #FFFFFF;
 }
 
 body.dark-mode .modal-content {
