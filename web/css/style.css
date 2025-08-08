@@ -698,7 +698,7 @@ body.dark-mode #turnstile-modal p {
     
     display: flex;
     align-items: center;
-    justify-content: space-between; /* [FIX] 改为 space-between 以更好地利用空间 */
+    justify-content: flex-start; /* [FIX] 改为 flex-start 以防止元素在换行时跳动 */
     flex-wrap: wrap;
     gap: 15px; /* [MOD] 调整按钮组之间的间距 */
     margin-top: 20px;
@@ -713,7 +713,7 @@ body.dark-mode #turnstile-modal p {
     flex-wrap: wrap; /* 允许换行 */
     gap: 15px; /* [MOD] 调整图标之间的间距 */
     align-items: center;
-    flex-grow: 1; /* [NEW] 允许图标组占据可用空间 */
+    /* flex-grow: 1; */ /* [REMOVED] 移除此属性，允许容器根据内容自然收缩，从而更好地触发换行 */
 }
 
 .icons {
