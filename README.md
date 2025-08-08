@@ -42,7 +42,7 @@
 3.  **安装并授权命令行工具**:
     ```bash
     # 安装 Cloudflare Wrangler
-    npm install
+    npm install wrangler
     # 登录并授权 Wrangler
     npx wrangler login
     ```
