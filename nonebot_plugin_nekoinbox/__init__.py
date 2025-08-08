@@ -118,7 +118,7 @@ async def handle_submission(matcher: Matcher, bot: Bot, event: Event, args: Mess
     await process_message(matcher, bot, event, args, "message")
 
 
-async def upload_to_cf(msg_type: str, user_name: str, user_id: str, content: str):
+async def upload_to_cf(msg_type: str, user_name: str, user_id: str, content: str) -> bool:
     """
     把整理好的消息打包，通过 HTTP POST 请求发送给 Cloudflare Worker。
     增加了失败重试机制，提高数据上传的成功率。
@@ -141,7 +141,7 @@ async def upload_to_cf(msg_type: str, user_name: str, user_id: str, content: str
             response = await async_client.post(api_url, json=payload, headers=headers)
             response.raise_for_status()  # 如果请求失败(非2xx状态码)，这里会抛出异常
             print(f"成功上传到 Cloudflare: {response.json()}")
-            return  # 成功了就直接返回
+            return True  # [FIX] 成功时明确返回 True
         except httpx.HTTPStatusError as e:
             print(f"上传到 Cloudflare 失败 (第 {attempt + 1} 次尝试)，状态码: {e.response.status_code}, 响应: {e.response.text}")
         except Exception as e:
@@ -152,3 +152,4 @@ async def upload_to_cf(msg_type: str, user_name: str, user_id: str, content: str
             await asyncio.sleep(retry_delay)
     
     print(f"尝试 {max_retries} 次后，上传到 Cloudflare 最终失败。")
+    return False # [FIX] 所有尝试失败后明确返回 False
